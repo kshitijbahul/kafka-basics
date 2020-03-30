@@ -6,6 +6,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Properties;
+import java.util.concurrent.ExecutionException;
+import java.util.stream.IntStream;
 
 public class ProducerWithCallBack {
     public static void main(String[] args) {
@@ -20,25 +22,38 @@ public class ProducerWithCallBack {
         //create producer
         KafkaProducer<String,String> kafkaProducer=new KafkaProducer<String, String>(properties);
         //Producer record
-        ProducerRecord<String,String> record = new ProducerRecord<String, String>("first_topic","Hello For code");
 
+        final String topic="first_topic";
         //send data --this is to send async
-        kafkaProducer.send(record, new Callback() {
-            @Override
-            public void onCompletion(RecordMetadata metadata, Exception exception) {
-                //executes everytime a record is successfully sent
-                if (exception==null){
-                    logger.info("Recieved new Metadata \n"+
-                            "Topic:"+metadata.topic()+"\n"+
-                            "Partition:"+metadata.partition()+"\n"+
-                            "Offset:"+metadata.offset()+"\n"+
-                            "timestamp:"+metadata.timestamp()
+        IntStream.range(0,10).forEach((index)->{
+            String value= "Hello World "+Integer.toString(index);
+            String key= "id_"+Integer.toString(index);
+            logger.info("Key is "+key);
+            ProducerRecord<String,String> record = new ProducerRecord<String, String>(topic,key,value);
+            try {
+                kafkaProducer.send(record, new Callback() {
+                    @Override
+                    public void onCompletion(RecordMetadata metadata, Exception exception) {
+                        //executes everytime a record is successfully sent
+                        if (exception==null){
+                            logger.info("Recieved new Metadata \n"+
+                                    "Topic:"+metadata.topic()+"\n"+
+                                    "Partition:"+metadata.partition()+"\n"+
+                                    "Offset:"+metadata.offset()+"\n"+
+                                    "timestamp:"+metadata.timestamp()
                             );
-                }else{
-                    logger.error("error in message",exception);
-                }
+                        }else{
+                            logger.error("error in message",exception);
+                        }
+                    }
+                }).get();//blocking the send to make it sync
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            } catch (ExecutionException e) {
+                e.printStackTrace();
             }
         });
+
         kafkaProducer.flush();
         kafkaProducer.close();
     }
